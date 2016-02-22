@@ -76,6 +76,11 @@ struct lock {
         char *lk_name;
         // add what you need here
         // (don't forget to mark things volatile as needed)
+        // adding @1136pm 13 Feb
+        struct wchan *lk_wchan ;
+        struct spinlock lk_lock ;
+        volatile struct thread *thread_having_lock ;
+        volatile int islocked ; // 0 means locked else unlocked
 };
 
 struct lock *lock_create(const char *name);
@@ -115,7 +120,14 @@ struct cv {
         char *cv_name;
         // add what you need here
         // (don't forget to mark things volatile as needed)
+		//my code begins
+		struct wchan *cv_wchan ;
+        struct spinlock cv_lock ;
+		
+
+		
 };
+
 
 struct cv *cv_create(const char *name);
 void cv_destroy(struct cv *);
@@ -174,3 +186,5 @@ void rwlock_acquire_write(struct rwlock *);
 void rwlock_release_write(struct rwlock *);
 
 #endif /* _SYNCH_H_ */
+
+

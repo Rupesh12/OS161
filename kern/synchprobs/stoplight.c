@@ -72,10 +72,19 @@
 /*
  * Called by the driver during initialization.
  */
-
+//struct lock *quadrant0 , *quadrant1 , *quadrant2 , *quadrant3 ;
+struct semaphore *quadrant0 , *quadrant1 , *quadrant2 , *quadrant3 ;
+struct lock *control ;
 void
 stoplight_init() {
-	return;
+ // just delete every thing and free up the memory
+ quadrant0 = sem_create("quadrant0",1) ; 
+ quadrant1 = sem_create("quadrant1",1) ;  
+ quadrant2 = sem_create("quadrant2",1) ;  
+ quadrant3 = sem_create("quadrant3",1) ; 
+ control =  lock_create("control") ;
+
+return ;
 }
 
 /*
@@ -83,36 +92,346 @@ stoplight_init() {
  */
 
 void stoplight_cleanup() {
+	sem_destroy(quadrant0);
+	sem_destroy(quadrant1);
+	sem_destroy(quadrant2);
+	sem_destroy(quadrant3);
+	
+	
 	return;
+
 }
 
-void
-turnright(uint32_t direction, uint32_t index)
+static
+struct semaphore *
+getQuadrant(int direction){
+	if(direction == 0){
+		return quadrant0 ;
+	}
+	else if(direction == 1){
+		return quadrant1 ;
+	}
+	else if(direction == 2){
+		return quadrant2 ;
+	}
+	else {
+		return quadrant3 ;
+	}
+}
+
+// void
+// turnright(uint32_t direction, uint32_t index)
+// {
+// 	//(void)direction;
+// 	//(void)index;
+// struct lock *entry_lk ;
+
+// 	int entry_dir ;
+
+// 	entry_dir = direction ;
+
+// 	//do
+// 	//{
+// 		//lock_acquire(control);
+// 		    entry_lk = getQuadrant(entry_dir) ;
+// 			lock_acquire(entry_lk);
+// 			inQuadrant(entry_dir,index);
+// 			lock_release(entry_lk);
+// 			leaveIntersection(index);
+							
+// 		// 	if(!lock_do_i_hold(entry_lk)){
+// 		// 	lock_release(entry_lk);
+// 		// //	lock_release(control) ;
+// 		// }
+// 	//}while(!lock_do_i_hold(entry_lk))  ; 
+
+	
+	
+	
+	
+	
+// 	//lock_release(control) ;
+
+// 	/*
+// 	 * Implement this function.
+// 	 */
+// 	return;
+// }
+
+ void
+ turnright(uint32_t direction, uint32_t index)
 {
-	(void)direction;
-	(void)index;
-	/*
-	 * Implement this function.
-	 */
-	return;
+//	(void)direction;
+//	(void)index;
+
+	int entry_dir ; 
+	entry_dir = direction ;
+	struct semaphore *entry_sem ;
+	int can_i_proced = 1 ; // only 0 means you can proced
+	entry_sem = getQuadrant(entry_dir);
+
+
+	do{
+		lock_acquire(control) ;
+		if(entry_sem->sem_count == 1)
+		{
+			P(entry_sem);
+			
+			can_i_proced = 0 ; // Yipee I can proceed now
+			
+		}
+		lock_release(control);
+	}
+	while(can_i_proced != 0) ;
+
+	while(can_i_proced == 0)
+	{
+		can_i_proced = 1 ;
+		inQuadrant(entry_dir,index);
+		leaveIntersection(index);
+		V(entry_sem);
+
+	}
+
+
+
+
+
+	return ;
 }
 void
 gostraight(uint32_t direction, uint32_t index)
 {
-	(void)direction;
-	(void)index;
-	/*
-	 * Implement this function.
-	 */
-	return;
+	int entry_dir ; 
+	entry_dir = direction ;
+	int exit_dir ; 
+	exit_dir = (direction+3) % 4 ;
+	struct semaphore *entry_sem, *exit_sem ;
+	int can_i_proced = 1 ; // only 0 means you can proced
+	entry_sem = getQuadrant(entry_dir);
+	exit_sem = getQuadrant(exit_dir);
+
+	do{
+		lock_acquire(control) ;
+		if(entry_sem->sem_count == 1 && exit_sem->sem_count == 1)
+		{
+			P(entry_sem);
+			P(exit_sem) ;
+			can_i_proced = 0 ; // Yipee I can proceed now
+			
+		}
+		lock_release(control);
+	}
+	while(can_i_proced != 0) ;
+
+	while(can_i_proced == 0)
+	{
+		can_i_proced = 1 ;
+		inQuadrant(entry_dir,index);
+		inQuadrant(exit_dir,index) ;
+		V(entry_sem);
+
+		leaveIntersection(index);
+		V(exit_sem);
+	}
+
+
+
+
+	return ;
 }
+// void
+// gostraight(uint32_t direction, uint32_t index)
+// {
+// 	//(void)direction;
+// 	//(void)index;
+	
+// 	struct lock *entry_lk , *exit_lk ;// *block_lk ;
+
+// 	int entry_dir, exit_dir; // block_dir ;
+
+// 	entry_dir = direction ;
+
+// 	exit_dir = (direction+3)%4 ;
+
+// 	//block_dir = (direction+2)%4 ;
+
+	
+
+// 	//do
+// 	//{
+// 		//lock_acquire(control);
+// 		entry_lk = getQuadrant(entry_dir) ;
+// 		lock_acquire(entry_lk);
+// 		inQuadrant(entry_dir,index);
+// 		exit_lk = getQuadrant(exit_dir) ;
+			
+// 		lock_acquire(exit_lk);
+// 		inQuadrant(exit_dir,index) ;
+// 		lock_release(entry_lk);
+		
+// 		lock_release(exit_lk);	
+// 		leaveIntersection(index);
+// //		block_lk = getQuadr                      ant(block_dir);
+// //		lock_acquire(block_lk);
+// 		//if(!lock_do_i_hold(entry_lk)||!lock_do_i_hold(exit_lk)||!lock_do_i_hold(block_lk)){
+// 		// if(!lock_do_i_hold(entry_lk)||!lock_do_i_hold(exit_lk))
+// 		// {
+// 		// 	lock_release(entry_lk);
+// 		// 	lock_release(exit_lk);
+// 		// //	lock_release(block_lk);
+// 		// //	lock_release(control) ;
+// 		// }
+// 	//}while(!lock_do_i_hold(entry_lk)&&!lock_do_i_hold(exit_lk))  ; 
+
+	
+	
+	
+	
+	
+// 	//lock_release(block_lk);
+	
+
+// 	//lock_release(control) ;
+
+
+
+
+// 	/*
+// 	 * Implement this function.
+// 	 */
+// 	return;
+// }
+// void
+// turnleft(uint32_t direction, uint32_t index)
+// {
+// 	(void)direction;
+// 	(void)index;
+// 	/*
+// 	 * Implement this function.
+// 	 */
+
+// 	  struct lock *entry_lk , *middle_lk, *last_lk ;
+
+// 	 int entry_dir, middle_dir, last_dir ;
+
+// 	 entry_dir = direction ;
+
+// 	 middle_dir = (direction+3)%4 ;
+
+// 	 last_dir = (direction+2)%4 ;
+
+	
+
+// 	 //do
+// 	 //{
+// 	 	//lock_acquire(control);
+// 	 	entry_lk = getQuadrant(entry_dir) ;
+// 	 	lock_acquire(entry_lk);
+// 	 inQuadrant(entry_dir,index);
+	 	
+// 	 	middle_lk = getQuadrant(middle_dir) ;
+	 
+
+// 	 	lock_acquire(middle_lk);
+// 	 	inQuadrant(middle_dir,index) ;
+// 	 	lock_release(entry_lk);
+
+// 	 	last_lk = getQuadrant(last_dir);
+	 	
+// 	 	lock_acquire(last_lk);
+// 	 	inQuadrant(last_dir,index) ;
+// 	 	lock_release(middle_lk);
+// 	 	lock_release(last_lk);
+// 	 	leaveIntersection(index);
+	 	
+	 
+	 		
+	 	
+// 	 	// if(!lock_do_i_hold(entry_lk)||!lock_do_i_hold(middle_lk)||!lock_do_i_hold(last_lk)){
+// 	 	// 	
+// 	 	// 	lock_release(middle_lk);
+// 	 	// 	lock_release(last_lk);
+// 	 	// //	lock_release(control) ;
+// 	 	// }
+// 	 //}while(!lock_do_i_hold(entry_lk)&&!lock_do_i_hold(middle_lk)&&!lock_do_i_hold(last_lk))  ; 
+
+	 
+	
+	 
+	 
+	 
+	 
+	
+	
+// 	 //lock_release(control) ;
+
+
+
+
+// 	 /*
+// 	 * Implement this function.
+// 	*/ 
+// 	return;
+// }
 void
 turnleft(uint32_t direction, uint32_t index)
 {
-	(void)direction;
-	(void)index;
+	//(void)direction;
+	//(void)index;
 	/*
 	 * Implement this function.
 	 */
+
+	  
+
+	 /*
+	 * Implement this function.
+	*/
+
+	int entry_dir ; 
+	entry_dir = direction ;
+	int middle_dir ;
+	middle_dir = (direction+3)%4 ;
+
+	int exit_dir ; 
+	exit_dir = (direction+2) % 4 ;
+	
+	struct semaphore *entry_sem, *middle_sem, *exit_sem ;
+	int can_i_proced = 1 ; // only 0 means you can proced
+	entry_sem = getQuadrant(entry_dir);
+	middle_sem = getQuadrant(middle_dir); 
+	exit_sem = getQuadrant(exit_dir);
+
+	do{
+		lock_acquire(control) ;
+		if(entry_sem->sem_count == 1 && middle_sem->sem_count == 1&& exit_sem->sem_count == 1)
+		{
+			P(entry_sem);
+			P(middle_sem);
+			P(exit_sem) ;
+			can_i_proced = 0 ; // Yipee I can proceed now
+			
+		}
+		lock_release(control);
+	}
+	while(can_i_proced != 0) ;
+
+	while(can_i_proced == 0)
+	{
+		can_i_proced = 1 ;
+		inQuadrant(entry_dir,index);
+		inQuadrant(middle_dir,index);
+		V(entry_sem);
+		inQuadrant(exit_dir,index);
+		V(middle_sem) ;
+		leaveIntersection(index);
+		V(exit_sem);
+	}
+
+
+
+
+	
 	return;
 }
