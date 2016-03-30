@@ -9,6 +9,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <unistd.h>
+#include <time.h>
+#include <stdio.h>
 #endif
 
 #include <kern/secure.h>
@@ -27,27 +30,39 @@
 static const unsigned char ipad[SHA256_BLOCK_SIZE] = { [0 ... SHA256_BLOCK_SIZE-1] = 0x36 };
 static const unsigned char opad[SHA256_BLOCK_SIZE] = { [0 ... SHA256_BLOCK_SIZE-1] = 0x5c };
 
+// Hack for not having a userspace malloc until ASST3. We 'allocate' these statuc buffers.
+// This works because the process single-threaded.
+#define NUM_BUFFERS 4
+#define BUFFER_LEN 1024
+
+static char temp_buffers[NUM_BUFFERS][BUFFER_LEN];
+static int buf_num = 0;
+
+#ifndef _KERNEL
+static int did_random = 0;
+#define NSEC_PER_MSEC 1000000ULL
+#define MSEC_PER_SEC 1000ULL
+#endif
+
+// Both userspace and the kernel are using the temp buffers now.
 static void * _alloc(size_t size)
 {
-#ifdef _KERNEL
-	return kmalloc(size);
-#else
-	return malloc(size);
-#endif
+	(void)size;
+	void *ptr = temp_buffers[buf_num];
+	buf_num++;
+	buf_num = buf_num % NUM_BUFFERS;
+	return ptr;
 }
 
 static void _free(void *ptr)
 {
-#ifdef _KERNEL
-	kfree(ptr);
-#else
-	free(ptr);
-#endif
+	(void)ptr;
 }
 
 /*
  * hamc_sha256 follows FIPS 198-1 HMAC using sha256.
  * See http://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf for details.
+ * NOTE: This is only thread-safe if called from within secprintf()!!!
  */
 static int hmac_sha256(const char *msg, size_t msg_len, const char *key, size_t key_len, 
 		unsigned char output[SHA256_OUTPUT_SIZE])
@@ -117,6 +132,20 @@ static void array_to_hex(unsigned char *a, size_t len, char *res)
 
 static void make_salt(char *salt_str)
 {
+#ifndef _KERNEL
+	if (!did_random) {
+		did_random = 1;
+		time_t sec;
+		unsigned long ns;
+		unsigned long long ms;
+
+		__time(&sec, &ns);
+		ms = (unsigned long long)sec * MSEC_PER_SEC;
+		ms += (ns / NSEC_PER_MSEC);
+		srandom((unsigned long)ms);
+	}
+#endif
+
 	// Compute salt value
 	uint32_t salt[SALT_BYTES/sizeof(uint32_t)];
 
@@ -150,6 +179,7 @@ int hmac(const char *msg, size_t msg_len, const char *key, size_t key_len,
 	return 0;
 }
 
+// NOTE: This is only thread-safe if called from within secprintf()!!!
 int hmac_salted(const char *msg, size_t msg_len, const char *key, size_t key_len, 
 		char **hash_str, char **salt_str)
 {

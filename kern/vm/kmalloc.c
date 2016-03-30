@@ -31,7 +31,7 @@
 #include <lib.h>
 #include <spinlock.h>
 #include <vm.h>
-#include <kern/secret.h>
+#include <kern/test161.h>
 #include <test.h>
 
 /*
@@ -819,26 +819,47 @@ kheap_printstats(void)
 	spinlock_release(&kmalloc_spinlock);
 }
 
+
 /*
- * Print number of used heap bytes.
+ * Return the number of used bytes.
  */
-void
-kheap_printused(void)
-{
+
+unsigned long
+kheap_getused(void) {
 	struct pageref *pr;
 	unsigned long total = 0;
-	/* print the whole thing with interrupts off */
-	spinlock_acquire(&kmalloc_spinlock);
+	unsigned int num_pages = 0, coremap_bytes = 0;
 
+	/* compute with interrupts off */
+	spinlock_acquire(&kmalloc_spinlock);
 	for (pr = allbase; pr != NULL; pr = pr->next_all) {
 		total += subpage_stats(pr, true);
+		num_pages++;
+	}
+
+	coremap_bytes = coremap_used_bytes();
+
+	// Don't double-count the pages we're using for subpage allocation;
+	// we've already accounted for the used portion.
+	if (coremap_bytes > 0) {
+		total += coremap_bytes - (num_pages * PAGE_SIZE);
 	}
 
 	spinlock_release(&kmalloc_spinlock);
 
+	return total;
+}
+
+/*
+ * Print number of used bytes.
+ */
+
+void
+kheap_printused(void)
+{
 	char total_string[32];
-	snprintf(total_string, sizeof(total_string), "%lu", total);
-	ksecprintf(SECRET, total_string, "khu");
+	snprintf(total_string, sizeof(total_string), "%lu", kheap_getused());
+	secprintf(SECRET, total_string, "khu");
 }
 
 ////////////////////////////////////////
@@ -994,7 +1015,7 @@ subpage_kmalloc(size_t sz
 	prpage = alloc_kpages(1);
 	if (prpage==0) {
 		/* Out of memory. */
-		kprintf("kmalloc: Subpage allocator couldn't get a page\n");
+		silent("kmalloc: Subpage allocator couldn't get a page\n");
 		return NULL;
 	}
 	KASSERT(prpage % PAGE_SIZE == 0);
