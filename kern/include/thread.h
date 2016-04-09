@@ -35,7 +35,8 @@
  *
  * Note: curthread is defined by <current.h>.
  */
-
+ 
+#include <limits.h>
 #include <array.h>
 #include <spinlock.h>
 #include <threadlist.h>
@@ -49,6 +50,7 @@ struct cpu;
 /* Size of kernel stacks; must be power of 2 */
 #define STACK_SIZE 4096
 #define MAX_NAME_LENGTH 64
+#define MAX_RUNNING_PROCS 256
 
 /* Mask for extracting the stack base address of a kernel stack pointer */
 #define STACK_MASK  (~(vaddr_t)(STACK_SIZE-1))
@@ -64,6 +66,32 @@ typedef enum {
 	S_SLEEP,	/* sleeping */
 	S_ZOMBIE,	/* zombie; exited but not yet deleted */
 } threadstate_t;
+
+/* asst2 */
+
+typedef struct filehandle_structure
+{
+	char *name; //file name
+    struct vnode *vn ;
+    struct lock *lock ; // lock for synchronization
+    off_t offset ; // file offset
+    mode_t mode ; // to have a check on permissions
+    int reference ; // to make sure it is shared properely
+
+} file_handle;
+
+/* process structure*/
+struct process { 
+
+    pid_t pid;
+    pid_t ppid; 
+    struct semaphore *exitsem; 
+    bool exited; 
+    int exitcode; 
+    struct thread* self; 
+};
+
+//struct process *process_table[MAX_RUNNING_PROCS];
 
 /* Thread structure. */
 struct thread {
@@ -116,6 +144,10 @@ struct thread {
 	 */
 
 	/* add more here as needed */
+	/* asst2 file table addition*/ 
+	 int file_count; // to track open files in file table
+	 file_handle *file_table[OPEN_MAX]; //file table
+	 pid_t process_id;
 };
 
 /*
@@ -127,6 +159,8 @@ struct thread {
 
 DECLARRAY(thread, THREADINLINE);
 DEFARRAY(thread, THREADINLINE);
+
+pid_t process_init(struct thread *t);
 
 /* Call once during system startup to allocate data structures. */
 void thread_bootstrap(void);

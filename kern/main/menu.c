@@ -46,6 +46,7 @@
 #include "opt-net.h"
 #include "opt-synchprobs.h"
 #include "opt-automationtest.h"
+#include <synch.h> 
 
 /*
  * In-kernel menu and command dispatcher.
@@ -117,6 +118,9 @@ common_prog(int nargs, char **args)
 {
 	struct proc *proc;
 	int result;
+	//struct semaphore *sem=sem_create("com_prog_t",1);
+	//P(sem);
+
 
 	/* Create a process for the new program to run in. */
 	proc = proc_create_runprogram(args[0] /* name */);
@@ -124,15 +128,20 @@ common_prog(int nargs, char **args)
 		return ENOMEM;
 	}
 
+	//P(process_table[proc->process_id]->exitsem);
 	result = thread_fork(args[0] /* thread name */,
 			proc /* new process */,
 			cmd_progthread /* thread function */,
 			args /* thread arg */, nargs /* thread arg */);
+
+	//P(process_table[proc->process_id]->exitsem);
+	//P(sem);
 	if (result) {
 		kprintf("thread_fork failed: %s\n", strerror(result));
 		proc_destroy(proc);
 		return result;
 	}
+	P(process_table[proc->process_id]->exitsem);
 
 	/*
 	 * The new process will be destroyed when the program exits...

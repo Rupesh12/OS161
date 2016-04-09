@@ -50,6 +50,7 @@
 #include <addrspace.h>
 #include <mainbus.h>
 #include <vnode.h>
+#include <syscall.h> 
 
 
 /* Magic number used as a guard value on kernel thread stacks. */
@@ -147,6 +148,14 @@ thread_create(const char *name)
 	thread->t_iplhigh_count = 1; /* corresponding to t_curspl */
 
 	/* If you add to struct thread, be sure to initialize here */
+	thread->file_count=0; //initially no file is opem
+	*(thread->file_table)=NULL; //file table is empty
+	pid_t id;
+	id=process_init(thread);
+	//kprintf("\nthread process %d",id);
+	if(id==-1)return NULL;
+	thread->process_id=id;
+	//thread->t_proc->process_id=id;
 
 	return thread;
 }
@@ -497,7 +506,9 @@ thread_fork(const char *name,
 {
 	struct thread *newthread;
 	int result;
-
+	//asst 2 addn begin
+	//pid_t cur=curthread->process_id;
+	//asst 2 addn ends
 	newthread = thread_create(name);
 	if (newthread == NULL) {
 		return ENOMEM;
@@ -514,6 +525,21 @@ thread_fork(const char *name,
 	/*
 	 * Now we clone various fields from the parent thread.
 	 */
+	 
+	//ass2 addition begin
+	int i;
+	
+	for(i=0;i<OPEN_MAX;i++)
+	{
+		newthread->file_table[i]=curthread->file_table[i];
+		if(newthread->file_table[i]!=NULL)
+			newthread->file_table[i]->reference++;
+	}
+	//kprintf("new thread id is %d",newthread->process_id);
+	process_table[newthread->process_id]->ppid=curthread->process_id;
+	proc->process_id=newthread->process_id;
+	//ass2 addition ends
+	
 
 	/* Thread subsystem fields */
 	newthread->t_cpu = curthread->t_cpu;
@@ -535,7 +561,10 @@ thread_fork(const char *name,
 	 * for the spllower() that will be done releasing it.
 	 */
 	newthread->t_iplhigh_count++;
-
+	
+	/*asst2 addition starts*/
+	//child=newthread;
+	//ass2 addn ends
 	/* Set up the switchframe so entrypoint() gets called */
 	switchframe_init(newthread, entrypoint, data1, data2);
 
@@ -1194,5 +1223,32 @@ interprocessor_interrupt(void)
 	}
 
 	curcpu->c_ipi_pending = 0;
-	spinlock_release(&curcpu->c_ipi_lock);
+	spinlock_release(&curcpu->c_ipi_lock);	
+}
+
+pid_t process_init(struct thread *t)
+{
+	struct process *p = kmalloc(sizeof(struct process));
+	pid_t id;
+	int i;
+	//struct semaphore *sem=sem_create("proc_sem",1);
+	for(i=2;i<MAX_RUNNING_PROCS+2;i++)
+	{
+		if(process_table[i]==NULL)
+			break;
+	}
+	if(i>=MAX_RUNNING_PROCS+2)
+		return -1;
+	id=i;
+
+	p->pid=id;
+	if(id==2)
+		p->ppid=-1;
+	else p->ppid=2;
+    p->exitsem=sem_create(t->t_name,0);
+    p->exited=false; 
+    p->exitcode=-1; 
+    p->self=t; 
+    process_table[i]=p;
+    return id;
 }

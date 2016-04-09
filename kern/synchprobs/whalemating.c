@@ -103,27 +103,30 @@ male(uint32_t index)
 	male_start(index);
 	lock_release(whmlock);
 	lock_acquire(whmlock);
-	while((f==0 || mm==0))
+	while((f==0 || mm==0) && all_set_f==0 && all_set_mm==0)
 	{
 		cv_wait(whm,whmlock);
 	}
 	
-	all_set_f=0;
-	all_set_mm=0;
-	all_set_m=1;
+	all_set_f=1;
+	all_set_mm=1;
+	all_set_m=0;
 	lock_release(whmlock);
-	/*
+	
+	if(all_set_f==1){
+
 	lock_acquire(whflock);
-	if(f>0){
-	cv_signal(whf,whflock);}
-	lock_release(whflock);
+	cv_signal(whf,whflock);
+	lock_release(whflock);}
+	if(all_set_mm==1){
 	lock_acquire(whmmlock);
-	if(mm>0){
-	cv_signal(whmm,whmmlock);}
-	lock_release(whmmlock);*/
+	
+	cv_signal(whmm,whmmlock);
+	lock_release(whmmlock);}
 	lock_acquire(whmlock);
 	male_end(index);
 	m--;
+	all_set_m=0;
 	lock_release(whmlock);
 	
 	
@@ -142,27 +145,29 @@ female(uint32_t index)
 	female_start(index);
 	lock_release(whflock);
 	lock_acquire(whflock);
-	while((m==0 || mm==0))
+	while((m==0 || mm==0)&& all_set_m==0 && all_set_mm==0)
 	{
 		cv_wait(whf,whflock);
 	}
 	
-	all_set_f=1;
-	all_set_mm=0;
-	all_set_m=0;
+	all_set_f=0;
+	all_set_mm=1;
+	all_set_m=1;
 	lock_release(whflock);
-	/*
+	
+	if(all_set_m==1){
 	lock_acquire(whmlock);
-	if(m>0){
-    cv_signal(whm,whmlock);}
-    lock_release(whmlock);
+    cv_signal(whm,whmlock);
+    lock_release(whmlock);}
+    if(all_set_mm==1){
     lock_acquire(whmmlock);
-    if(mm>0){
-    cv_signal(whmm,whmmlock);}
-    lock_release(whmmlock);*/
+    
+    cv_signal(whmm,whmmlock);
+    lock_release(whmmlock);}
 	lock_acquire(whflock);
 	female_end(index);
 	f--;
+	all_set_f=0;
 	lock_release(whflock);
 	//spinlock_release(sl);
 	/*
@@ -182,26 +187,29 @@ matchmaker(uint32_t index)
 	matchmaker_start(index);
 	lock_release(whmmlock);
 	lock_acquire(whmmlock);
-	while((m==0 || f==0))
+	while((m==0 || f==0)&& all_set_m==0&&all_set_f==0)
 	{
 		cv_wait(whmm,whmmlock);
 	}
 	
 	lock_release(whmmlock);
-	all_set_f=0;
-	all_set_mm=1;
-	all_set_m=0;
+	all_set_f=1;
+	all_set_mm=0;
+	all_set_m=1;
+	if(all_set_m==1){
 	lock_acquire(whmlock);
-	if(m>0){
-	cv_signal(whm,whmlock);}
-	lock_release(whmlock);
+	
+	cv_signal(whm,whmlock);
+	lock_release(whmlock);}
+	if(all_set_f==1){
 	lock_acquire(whflock);
-	if(f>0){
-	cv_signal(whf,whflock);}
-	lock_release(whflock);
+	
+	cv_signal(whf,whflock);
+	lock_release(whflock);}
 	lock_acquire(whmmlock);
 	matchmaker_end(index);
 	mm--;
+	all_set_mm=0;
 	lock_release(whmmlock);
 	//spinlock_release(sl);
 	/*

@@ -29,10 +29,12 @@
 
 #ifndef _SYSCALL_H_
 #define _SYSCALL_H_
-
+#define MAX_RUNNING_PROCS 256
 
 #include <cdefs.h> /* for __DEAD */
 struct trapframe; /* from <machine/trapframe.h> */
+struct process *process_table[MAX_RUNNING_PROCS];
+pid_t child_id;
 
 /*
  * The system call dispatcher.
@@ -58,5 +60,19 @@ __DEAD void enter_new_process(int argc, userptr_t argv, userptr_t env,
 
 int sys_reboot(int code);
 int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
+void initialize_ft(void);
+int sys___open(char *filename, int flags,mode_t mode,int *retval);
+int sys___close(int fd);
+ssize_t sys___read(int fd, void *buf, size_t buflen,int *retval);
+ssize_t sys___write(int fd, void *buf, size_t buflen,int *retval);
+void sys___exit(int exitcode);
+int sys___fork(struct trapframe *p_tf,int *retval);
+void child_forkentry(void *data1, unsigned long data2);
+int sys___getpid(int *retval);
+pid_t sys___waitpid(pid_t pid, int *status, int options,int *retval);
+int sys_waitpid(pid_t pid, int *status, int options,int *retval);
+int sys_exit(int exitcode);
+int execv(char *program, char **args);
+
 
 #endif /* _SYSCALL_H_ */

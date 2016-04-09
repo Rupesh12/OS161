@@ -44,6 +44,7 @@
 #include <vfs.h>
 #include <syscall.h>
 #include <test.h>
+#include <thread.h> 
 
 /*
  * Load program "progname" and start running it in usermode.
@@ -58,6 +59,8 @@ runprogram(char *progname)
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
+
+	initialize_ft();
 
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);

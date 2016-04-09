@@ -57,7 +57,7 @@ struct proc *kproc;
 /*
  * Create a proc structure.
  */
-static
+
 struct proc *
 proc_create(const char *name)
 {
@@ -81,6 +81,9 @@ proc_create(const char *name)
 
 	/* VFS fields */
 	proc->p_cwd = NULL;
+	//ass2 addn begin
+	//proc->process_id=curthread->process_id;
+	//ass2 addn ends
 
 	return proc;
 }
@@ -217,6 +220,7 @@ proc_create_runprogram(const char *name)
 		newproc->p_cwd = curproc->p_cwd;
 	}
 	spinlock_release(&curproc->p_lock);
+	//newproc->process_id=curthread->process_id;
 
 	return newproc;
 }
@@ -243,6 +247,9 @@ proc_addthread(struct proc *proc, struct thread *t)
 
 	spl = splhigh();
 	t->t_proc = proc;
+	//ass2 addn
+	proc->process_id=t->process_id;
+	//ass2 ends
 	splx(spl);
 
 	return 0;
