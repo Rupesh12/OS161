@@ -103,16 +103,6 @@ void child_forkentry(void *data1, unsigned long data2)
 
 }
 
-void sys___exit(int exitcode)
-{
-	process_table[curthread->process_id]->exited=true;
-	process_table[curthread->process_id]->exitcode=_MKWAIT_EXIT(exitcode);
-	V(process_table[curthread->process_id]->exitsem);
-
-	//(void)exitcode;
-	thread_exit();
-}
-
 int sys___getpid(int *retval)
 {
 	*retval=curthread->process_id;
@@ -120,34 +110,6 @@ int sys___getpid(int *retval)
 }
 
 
-pid_t
-sys___waitpid(pid_t pid, int *status, int options,int *retval)
-{
-
-	int p,pp,i,result;
-	int a=options;
-	a++;
-	for(i=0;i<OPEN_MAX;i++)
-	{
-		if(process_table[i]->pid==pid)
-		{
-			p=i;
-			pp=process_table[i]->ppid;
-		}
-	}
-	a=pp;
-	if(process_table[p]->exitcode == -1){
-		P(process_table[p]->exitsem);
-	}
-	int ec=process_table[p]->exitcode;
-	result=copyout((const void *)&ec,(userptr_t)status,sizeof(int));
-	if(result){
-		return result;
-	}
-	*retval=pid;
-	return 0;
-
-}
 
 int
 sys_waitpid(pid_t pid, int *status, int options,int *retval)
