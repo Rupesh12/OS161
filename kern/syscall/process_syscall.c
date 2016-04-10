@@ -61,16 +61,34 @@
 int sys___fork(struct trapframe *p_tf,int *retval)
 {
 	//struct trapframe *tf=(struct trapframe *)kmalloc(sizeof(struct trapframe));
+	if(p_tf==NULL)
+		return ENOMEM;
 	struct trapframe* tf = (struct trapframe*)kmalloc(sizeof(struct trapframe));
+	if(tf==NULL)
+		return ENOMEM;
 	*tf=*p_tf;
-	struct addrspace *as;
-	int result=*retval;
-	as_copy(curthread->t_proc->p_addrspace, &as);
-	struct proc *child=proc_create("child");
-	//thread fork function here
-	result = thread_fork(curthread->t_name,child,child_forkentry,(void *) tf,(unsigned long) as);
+	//struct addrspace *as;
+	int result;
+	//result=as_copy(curthread->t_proc->p_addrspace, &as);
+	//if(result)
+	//	return ENOMEM;
+	struct proc *child=proc_create_runprogram("child");
+	if(child==NULL)
+		return ENOMEM;
+	result=as_copy(curthread->t_proc->p_addrspace, &child->p_addrspace);
 	if(result)
 		return ENOMEM;
+	//thread fork function here
+	//result = thread_fork(curthread->t_name,child,child_forkentry,(void *) tf,(unsigned long) as);
+	result=thread_fork(curthread->t_name,child,child_forkentry,(void *) tf,(unsigned long) child->p_addrspace);
+	if(result)
+	{
+		//kfree(tf);
+		//tf=NULL;
+		//proc_destroy(child);
+		return ENOMEM;
+	}
+		
 
 	/*
 	for(int i=0;i<OPEN_MAX;i++)
