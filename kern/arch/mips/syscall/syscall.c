@@ -35,6 +35,7 @@
 #include <thread.h>
 #include <current.h>
 #include <syscall.h>
+#include <copyinout.h> 
 
 
 /*
@@ -79,8 +80,9 @@ void
 syscall(struct trapframe *tf)
 {
 	int callno;
-	int32_t retval;
-	int err;
+	int32_t retval,retval1;
+	int err,whence;
+	off_t pos;
 
 	KASSERT(curthread != NULL);
 	KASSERT(curthread->t_curspl == 0);
@@ -161,6 +163,21 @@ syscall(struct trapframe *tf)
 	    case SYS_execv:
 	    	err=execv((char *)tf->tf_a0, (char **)tf->tf_a1);
 	    break;
+
+	    case SYS_lseek:
+
+            pos = ((off_t)tf->tf_a2) << 32 | tf->tf_a3;
+            err = copyin((const_userptr_t)tf->tf_sp+16, &whence, sizeof(int));
+            if(err) {
+                break ;
+            }
+            err = sys_lseek(tf->tf_a0, pos, whence, &retval, &retval1);
+            if(!err) 
+                {
+                        tf->tf_v1 = retval1;
+                }
+            break;
+
 	    	
 	    default:
 		kprintf("Unknown syscall %d\n", callno);

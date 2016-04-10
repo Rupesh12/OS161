@@ -50,6 +50,8 @@
 #include <vnode.h>
 #include <vfs.h>
 #include <kern/fcntl.h> 
+#include <kern/seek.h> 
+#include <kern/stat.h> 
 
 
 /*
@@ -272,3 +274,67 @@ ssize_t sys___write(int fd, void *buf, size_t buflen, int *retval)
 	return 0;
 
 }
+
+off_t
+sys_lseek(int file_handle, off_t pos, int whence,int *retval,int *retval1)
+{
+    
+    int error ;
+    off_t new_pos ; 
+    struct stat temp ;
+    // Checking that passed arguments are correct
+    if(file_handle<0 || file_handle>= OPEN_MAX || curthread->file_table[file_handle]== NULL )
+    {
+        *retval = -1 ;
+        return EBADF ;
+    }
+
+    lock_acquire(curthread->file_table[file_handle]->lock);
+
+    switch(whence){
+        case SEEK_SET: 
+            new_pos = pos ;
+            break ;
+
+        case SEEK_CUR:
+            new_pos = curthread->file_table[file_handle]->offset +pos ;
+            break ;
+
+        case SEEK_END:
+            error = VOP_STAT(curthread->file_table[file_handle]->vn, &temp) ;
+            if(error)
+            {
+                *retval = -1 ;
+                return EINVAL ;
+            }
+            new_pos = temp.st_size + pos ;
+            break;
+            default :
+                lock_release(curthread->file_table[file_handle]->lock);
+                return EINVAL ;
+    }
+
+    if(new_pos < 0)
+    {
+        lock_release(curthread->file_table[file_handle]->lock);
+        return EINVAL ;
+    }
+    // pOTENTIAL error of arguments
+    error = VOP_ISSEEKABLE(curthread->file_table[file_handle]->vn) ;
+    // Modifaction for Is seekable
+    if(!error)
+    {
+        lock_release(curthread->file_table[file_handle]->lock);
+        return error ;
+    }
+
+    // All check done 
+    // Updating the offset in the file_table
+    curthread->file_table[file_handle]->offset  = new_pos ;
+
+    *retval = (uint32_t)((new_pos & 0xFFFFFFFF00000000) >> 32);
+    *retval1 = (uint32_t)(new_pos & 0xFFFFFFFF);
+
+    lock_release(curthread->file_table[file_handle]->lock);
+    return 0 ;
+}   
