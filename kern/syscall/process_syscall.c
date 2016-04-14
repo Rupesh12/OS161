@@ -83,9 +83,9 @@ int sys___fork(struct trapframe *p_tf,int *retval)
 	result=thread_fork(curthread->t_name,child,child_forkentry,(void *) tf,(unsigned long) child->p_addrspace);
 	if(result)
 	{
-		//kfree(tf);
+		kfree(tf);
 		//tf=NULL;
-		//proc_destroy(child);
+		proc_destroy(child);
 		return ENOMEM;
 	}
 		
@@ -166,6 +166,126 @@ execv(char *program, char **args)
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
+	/*
+	//ass2 addn begin
+	size_t len;
+	unsigned j,k;
+	if(program==NULL || args == NULL)
+		return EFAULT;
+	char *prog=(char *)kmalloc(sizeof(char)*PATH_MAX);
+	result= copyinstr((const_userptr_t) program, prog, PATH_MAX, &len);
+	if(result)
+		return EINVAL;
+	int i=0;
+	char ** buf;
+	while(args[i]!=NULL)i++;
+	buf=(char **)kmalloc(ARG_MAX*sizeof(char **));
+	//result=copyin((const_userptr_t) args, &buf, 4*i);
+	//if (result)
+	//	return EFAULT;
+	i=0;
+	
+	while(args[i]!=NULL)
+	{
+		char *temp=(char *)kmalloc(sizeof(char)*PATH_MAX);
+		result=copyinstr((const_userptr_t) args[i], temp, PATH_MAX, &len);
+		if(result)
+			return EFAULT;
+		//kprintf("%d",strlen(args[i]));
+		buf[i]=temp;
+		i++;
+	}
+	int argc=i;
+	buf[i]=NULL;
+	//ass2 addn ends
+	*/
+	/* Open the file. */
+	result = vfs_open(program, O_RDONLY, 0, &v);
+	if (result) {
+		return result;
+	}
+	as_destroy(proc_getas());
+	proc_setas(NULL);
+	/* We should be a new process. */
+	KASSERT(proc_getas() == NULL);
+
+	/* Create a new address space. */
+	as = as_create();
+	if (as == NULL) {
+		vfs_close(v);
+		return ENOMEM;
+	}
+
+	/* Switch to it and activate it. */
+	proc_setas(as);
+	as_activate();
+
+	/* Load the executable. */
+	result = load_elf(v, &entrypoint);
+	if (result) {
+		/* p_addrspace will go away when curproc is destroyed */
+		vfs_close(v);
+		return result;
+	}
+
+	/* Done with the file now. */
+	vfs_close(v);
+
+	/* Define the user stack in the address space */
+	result = as_define_stack(as, &stackptr);
+	if (result) {
+		/* p_addrspace will go away when curproc is destroyed */
+		return result;
+	}
+
+	/* Warp to user mode. */
+	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
+			  NULL /*userspace addr of environment*/,
+			  stackptr, entrypoint);
+
+	
+
+	/* enter_new_process does not return. */
+	panic("enter_new_process returned\n");
+	return EINVAL;
+}
+int
+execv_test(char *program, char **args)
+{
+	(void)program;
+	(void)args;
+	struct addrspace *as;
+	struct vnode *v;
+	vaddr_t entrypoint, stackptr;
+	int result,i=0,argc;
+	//unsigned k,j;
+	(void)argc;
+	//char *temp;
+	//copy arguments into kernel buffer
+	char **buf =(char **) kmalloc(sizeof(char **));
+	copyin((const_userptr_t) args, buf, sizeof(buf));
+	size_t t;
+	while(args[i] != NULL)
+	{	/*
+		temp =args[i];
+		j=strlen(args[i])+1;
+		temp[j]='\0';
+		while(j%4 !=0)
+		{
+			temp[++j]='\0';
+		}
+		//buf[i++]=temp;*/
+		buf[i]= kmalloc(sizeof(char)*PATH_MAX);
+		result=copyinstr((userptr_t)args[i], (buf[i]), PATH_MAX,&t);;
+		if(result)
+			return result;
+		i++;
+	}
+	buf[i]=NULL;
+	argc=i;
+	int jj=0;
+	while(buf[jj]!=NULL)
+		kprintf("\n len %d",strlen(buf[jj]));
 
 
 	/* Open the file. */
@@ -206,7 +326,11 @@ execv(char *program, char **args)
 		/* p_addrspace will go away when curproc is destroyed */
 		return result;
 	}
-
+	/*
+	//ass 2 addn starts
+	
+	//ass2 addn ends
+	*/
 	/* Warp to user mode. */
 	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
