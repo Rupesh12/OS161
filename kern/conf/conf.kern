@@ -346,7 +346,6 @@ file      proc/proc.c
 #
 
 file      vm/kmalloc.c
-file	  vm/mipsvm.c
 
 optofffile dumbvm   vm/addrspace.c
 
