@@ -35,6 +35,7 @@
 struct trapframe; /* from <machine/trapframe.h> */
 struct process *process_table[MAX_RUNNING_PROCS];
 pid_t child_id;
+char **execbuf;
 
 /*
  * The system call dispatcher.

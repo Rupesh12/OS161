@@ -166,7 +166,7 @@ execv(char *program, char **args)
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
-	/*
+	
 	//ass2 addn begin
 	size_t len;
 	unsigned j,k;
@@ -177,9 +177,9 @@ execv(char *program, char **args)
 	if(result)
 		return EINVAL;
 	int i=0;
-	char ** buf;
+	//char ** buf;
 	while(args[i]!=NULL)i++;
-	buf=(char **)kmalloc(ARG_MAX*sizeof(char **));
+	execbuf=(char **)kmalloc(128*sizeof(char *));
 	//result=copyin((const_userptr_t) args, &buf, 4*i);
 	//if (result)
 	//	return EFAULT;
@@ -187,20 +187,26 @@ execv(char *program, char **args)
 	
 	while(args[i]!=NULL)
 	{
-		char *temp=(char *)kmalloc(sizeof(char)*PATH_MAX);
-		result=copyinstr((const_userptr_t) args[i], temp, PATH_MAX, &len);
+		execbuf[i]=(char *)kmalloc(sizeof(char)*PATH_MAX);
+		result=copyinstr((const_userptr_t) args[i], execbuf[i], PATH_MAX, &len);
 		if(result)
 			return EFAULT;
 		//kprintf("%d",strlen(args[i]));
-		buf[i]=temp;
+		//*execbuf[i]=(char *)temp;
 		i++;
+		//kprintf("%s",temp);
 	}
+	execbuf[i]=NULL;
 	int argc=i;
-	buf[i]=NULL;
+	
+	//int argc=i;
+	//buf[i]=NULL;
 	//ass2 addn ends
-	*/
+	
+	//panic("exec v panic");
+	
 	/* Open the file. */
-	result = vfs_open(program, O_RDONLY, 0, &v);
+	result = vfs_open(prog, O_RDONLY, 0, &v);
 	if (result) {
 		return result;
 	}
@@ -238,11 +244,60 @@ execv(char *program, char **args)
 		return result;
 	}
 
+	//ass2 addn begin
+	
+	i=argc-1;
+	//kprintf("%d",stackptr);
+	char **lenarray=kmalloc(sizeof(char *)*(argc+1));
+	for(i=argc-1;i>=0;i--)
+	{
+		j=strlen(execbuf[i])+1;
+		while(j%4 !=0)j++;
+		char *arg=kmalloc(j*sizeof(char));
+		k=0;
+		while(k<strlen(execbuf[i]))
+		{
+			arg[k]=execbuf[i][k];
+			k++;
+		}
+		while(k<j)
+		{
+			arg[k++]='\0';
+		}
+		stackptr-=j;
+		lenarray[i]=(char *)stackptr;
+		//result=copyin((const_userptr_t) stackptr, execbuf[i],4*sizeof(char));
+		//if(result)
+		//	return EFAULTr
+		//kprintf("length copied : %d\n",len);
+		//kprintf("\n%d",stackptr);
+		//kprintf("\n%d",lenarray[i]);
+		result=copyout((const void *)arg,(userptr_t)stackptr,j);
+		if(result)
+		return EFAULT;
+		//kprintf("\n%s",*stackptr);
+		kfree(arg);
+
+	}
+	lenarray[argc]=NULL;
+	stackptr-=((argc+1)*sizeof(char *));
+	result = copyout((const void *)lenarray,(userptr_t)stackptr,(argc+1)*sizeof(char *));
+	/*
+	for(i=argc;i>=0;i--)
+	{
+		stackptr-=(sizeof(char *));
+		result=copyout((const void *)lenarray[i],(userptr_t)stackptr,sizeof(char *));
+		if(result)
+		return EFAULT;
+
+	}*/
+		//kprintf("argc %d",argc);
+		//panic("exec v panic");
+	//ass2 addn ends
 	/* Warp to user mode. */
-	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
+	enter_new_process(argc /*argc*/, (userptr_t)stackptr /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
 			  stackptr, entrypoint);
-
 	
 
 	/* enter_new_process does not return. */
