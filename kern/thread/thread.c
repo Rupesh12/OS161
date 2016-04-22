@@ -71,6 +71,11 @@ unsigned num_cpus;
 /* Used to wait for secondary CPUs to come online. */
 static struct semaphore *cpu_startup_sem;
 
+/* Used to synchronize exit cleanup. */
+unsigned thread_count = 0;
+static struct spinlock thread_count_lock = SPINLOCK_INITIALIZER;
+static struct wchan *thread_count_wchan;
+
 ////////////////////////////////////////////////////////////
 
 /*
@@ -434,6 +439,7 @@ thread_start_cpus(void)
 	kprintf("cpu0: %s\n", buf);
 
 	cpu_startup_sem = sem_create("cpu_hatch", 0);
+	thread_count_wchan = wchan_create("thread_count");
 	mainbus_start_cpus();
 
 	num_cpus = cpuarray_num(&allcpus);
@@ -447,6 +453,12 @@ thread_start_cpus(void)
 		kprintf("%d CPUs online\n", i + 1);
 	}
 	cpu_startup_sem = NULL;
+
+	// Gross hack to deal with os/161 "idle" threads. Hardcode the thread count
+	// to 1 so the inc/dec properly works in thread_[fork/exit]. The one thread
+	// is the cpu0 boot thread (menu), which is the only thread that hasn't
+	// exited yet.
+	thread_count = 1;
 }
 
 /*
@@ -561,10 +573,19 @@ thread_fork(const char *name,
 	 * for the spllower() that will be done releasing it.
 	 */
 	newthread->t_iplhigh_count++;
+
 	
 	/*asst2 addition starts*/
 	//child=newthread;
 	//ass2 addn ends
+
+
+	spinlock_acquire(&thread_count_lock);
+	++thread_count;
+	wchan_wakeall(thread_count_wchan, &thread_count_lock);
+	spinlock_release(&thread_count_lock);
+
+
 	/* Set up the switchframe so entrypoint() gets called */
 	switchframe_init(newthread, entrypoint, data1, data2);
 
@@ -827,6 +848,14 @@ thread_exit(void)
 
 	/* Check the stack guard band. */
 	thread_checkstack(cur);
+
+	// Decrement the thread count and notify anyone interested.
+	if (thread_count) {
+		spinlock_acquire(&thread_count_lock);
+		--thread_count;
+		wchan_wakeall(thread_count_wchan, &thread_count_lock);
+		spinlock_release(&thread_count_lock);
+	}
 
 	/* Interrupts off on this processor */
 	splhigh();
@@ -1251,4 +1280,16 @@ pid_t process_init(struct thread *t)
     p->self=t; 
     process_table[i]=p;
     return id;
+}
+
+/*
+ * Wait for the thread count to equal tc.
+ */
+void thread_wait_for_count(unsigned tc)
+{
+	spinlock_acquire(&thread_count_lock);
+	while (thread_count != tc) {
+		wchan_sleep(thread_count_wchan, &thread_count_lock);
+	}
+	spinlock_release(&thread_count_lock);
 }

@@ -76,5 +76,6 @@ int sys_exit(int exitcode);
 int execv(char *program, char **args);
 off_t sys_lseek(int file_handle, off_t pos, int whence,int *retval,int *retval1);
 int execv_test(char *program, char **args);
+int dup2(int oldfd, int newfd, int *retval);
 
 #endif /* _SYSCALL_H_ */

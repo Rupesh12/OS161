@@ -147,9 +147,9 @@ sys___open(char *filename, int flags,mode_t mode, int *retval)
 
 	return 0;
 }
-
+/*
 int
-sys___close(int fd)
+sys_close(int fd)
 {
 	file_handle *entry;
 
@@ -179,7 +179,49 @@ sys___close(int fd)
 	return 0;
 
 }
+*/
+int
+sys___close(int fd) //after TA's corrections
+{
+	file_handle *entry;
 
+	if(fd<0 || fd>= OPEN_MAX)
+		return EBADF;
+	
+	if (curthread->file_table[fd]==NULL)
+		return EBADF;
+
+	lock_acquire(curthread->file_table[fd]->lock);
+	if(curthread->file_table[fd]->reference ==1)
+	{
+		vfs_close(curthread->file_table[fd]->vn);
+		curthread->file_table[fd]->reference--;
+		lock_release(curthread->file_table[fd]->lock);
+	   lock_destroy(curthread->file_table[fd]->lock);
+	    entry=curthread->file_table[fd];
+		curthread->file_table[fd]=NULL;
+		curthread->file_count--;
+		kfree(entry);
+
+	}
+
+	else
+		{curthread->file_table[fd]->reference--;
+
+	// Buggy code, needed to be rectified done // :)
+
+		lock_release(curthread->file_table[fd]->lock);
+	}
+	// lock_destroy(curthread->file_table[fd]->lock);
+
+	// entry=curthread->file_table[fd];
+	// curthread->file_table[fd]=NULL;
+	// curthread->file_count--;
+	// kfree(entry);
+
+	return 0;
+
+}
 ssize_t sys___read(int fd, void *buf, size_t buflen, int *retval)
 {
 	size_t stoplen;
@@ -338,3 +380,62 @@ sys_lseek(int file_handle, off_t pos, int whence,int *retval,int *retval1)
     lock_release(curthread->file_table[file_handle]->lock);
     return 0 ;
 }   
+
+int
+dup2(int oldfd, int newfd, int *retval){
+
+	int error ;
+
+	// checking the the arguments passed points to a valid file handle to be cloned.
+	if(oldfd >= OPEN_MAX || oldfd< 0 || newfd >= OPEN_MAX || newfd < 0)
+	{
+		*retval = -1 ;
+		return EBADF ;
+	}
+
+	// if both the oldfd and newfd are equal, then just set the newfd = old fd
+
+	if(oldfd == newfd){
+		*retval = newfd ;
+		return 0 ;
+	}
+
+	// if the new file handle is already opend, then close that file first before clonning
+	if(curthread->file_table[newfd] != NULL){
+		error = sys___close(newfd) ;
+
+			// if there is an error inclosing that file return it
+		if(error){
+			*retval = -1 ;
+			return error ;
+		}
+	}
+	if(curthread->file_table[oldfd]== NULL)
+	{
+		*retval = -1 ;
+		return error ;
+	}
+
+	// If every is awesome lol ... then let's start clonning :)
+	lock_acquire(curthread->file_table[oldfd]->lock) ;
+	
+	curthread->file_table[oldfd]->reference++; // incrementing the reference counter to synchronize the closing operation
+  
+    curthread->file_table[newfd]->name = kstrdup(curthread->file_table[oldfd]->name);
+	curthread->file_table[newfd]-> vn = curthread->file_table[oldfd]-> vn ;
+	curthread->file_table[newfd]-> lock = lock_create("dup2 lock");
+	curthread->file_table[newfd]-> offset = curthread->file_table[oldfd]->offset ;
+	curthread->file_table[newfd]->mode = curthread->file_table[oldfd]->mode ;
+	curthread->file_table[newfd]->reference = curthread	->file_table[oldfd]->reference ;
+	//End of Clonning :) :)
+		
+
+
+
+	 
+	
+	lock_release(curthread->file_table[oldfd]->lock);
+	
+	*retval = newfd ;
+	return 0 ; 
+}
