@@ -182,23 +182,28 @@ alloc_kpages(unsigned npages)
 	{
 		if(npages==1)
 		{
-			//spinlock_acquire(&stealmem_lock);
+			spinlock_acquire(&stealmem_lock);
 			i=0;
 			while(i<no_of_pages_in_coremap && coremap[i].page_state!=0)i++;
-			if(i>=no_of_pages_in_coremap) return 0;
+			if(i>=no_of_pages_in_coremap) 
+			{
+				spinlock_release(&stealmem_lock);
+				return 0;
+			}
+				
 			coremap[i].page_state=2;
-			//spinlock_release(&stealmem_lock);
+			spinlock_release(&stealmem_lock);
 			return coremap[i].virtual_add;
 		}
 
 		else 
 		{
-			//spinlock_acquire(&stealmem_lock);
+			spinlock_acquire(&stealmem_lock);
 			i=0;
 		m2:		while(i<no_of_pages_in_coremap && coremap[i].page_state!=0)i++;
 				if(i>=no_of_pages_in_coremap)
 				{ 
-			//		spinlock_release(&stealmem_lock);
+					spinlock_release(&stealmem_lock);
 					return 0;
 				}
 				cons=true;
@@ -225,9 +230,9 @@ alloc_kpages(unsigned npages)
         			coremap[j].page_begin = coremap[i].virtual_add ;
         			j++;
 				}
-			//	spinlock_release(&stealmem_lock);
+				
+			spinlock_release(&stealmem_lock);
 			}
-			
 			return coremap[i].virtual_add;
 		}
 	}
@@ -245,7 +250,7 @@ free_kpages(vaddr_t addr)
 
 	(void)addr;
 	unsigned int i,j;
-	//spinlock_acquire(&stealmem_lock);
+	spinlock_acquire(&stealmem_lock);
 	i=0;
 	while (i<no_of_pages_in_coremap && coremap[i].virtual_add!=addr)i++;
 	if((coremap[i].virtual_add==addr && coremap[i].page_state!=1) && i<no_of_pages_in_coremap)
@@ -260,7 +265,7 @@ free_kpages(vaddr_t addr)
 
 	}
 
-	//spinlock_release(&stealmem_lock);
+	spinlock_release(&stealmem_lock);
 }
 
 unsigned

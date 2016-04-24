@@ -291,7 +291,6 @@ thread_destroy(struct thread *thread)
 
 	/* sheer paranoia */
 	thread->t_wchan_name = "DESTROYED";
-
 	kfree(thread);
 }
 
@@ -549,6 +548,7 @@ thread_fork(const char *name,
 	}
 	//kprintf("new thread id is %d",newthread->process_id);
 	process_table[newthread->process_id]->ppid=curthread->process_id;
+	if(proc!=NULL)
 	proc->process_id=newthread->process_id;
 	//ass2 addition ends
 	
