@@ -71,6 +71,8 @@ ram_bootstrap(void)
 
 	kprintf("%uk physical memory available\n",
 		(lastpaddr-firstpaddr)/1024);
+
+	
 }
 
 /*

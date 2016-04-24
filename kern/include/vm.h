@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
- *	The President and Fellows of Harvard College.
+ *  The President and Fellows of Harvard College.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,6 +35,19 @@
  *
  * You'll probably want to add stuff here.
  */
+
+ // Changes done by Rupesh on April 21st 2016
+ 
+ // enum page_state_t {FREE, DIRTY, CLEAN, FIXED}; // to denote all possible page states
+  struct coremap_entry
+  {
+    // following "pearls in life" 
+    //struct addrspace* as ;
+    vaddr_t virtual_add ;
+    paddr_t physical_add ;
+    vaddr_t page_begin;
+    int page_state ;
+  };
 
 
 #include <machine/vm.h>

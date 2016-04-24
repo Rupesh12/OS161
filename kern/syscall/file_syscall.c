@@ -63,6 +63,7 @@ void initialize_ft(void)
 	int i;
 	char filepath[]="con:";
 	struct vnode *node;
+	curthread->file_count=3;
 
 	vfs_open(filepath, O_RDONLY, 0, &node);
 
@@ -97,6 +98,7 @@ sys___open(char *filename, int flags,mode_t mode, int *retval)
 	struct vnode *node;
 	int error;
 	size_t temp;
+	int kflags;
 
 	if(filename==NULL ) 
 		return EFAULT; //kuch likhana hai user space me rakhana hai 
@@ -117,6 +119,7 @@ sys___open(char *filename, int flags,mode_t mode, int *retval)
 			return error;
 		
 
+	error=copyin((const_userptr_t) flags, &kflags, sizeof(int));	
 	//end
 	
 	error = vfs_open(filepath, flags, mode, &node);
@@ -139,7 +142,7 @@ sys___open(char *filename, int flags,mode_t mode, int *retval)
 	    curthread->file_table[i]->vn=node;
 	    curthread->file_table[i]->lock=lock_create(filepath) ; // lock for synchronization
 	    curthread->file_table[i]->offset=0 ; // file offset
-	    curthread->file_table[i]->mode=flags; // to have a check on permissions
+	    curthread->file_table[i]->mode=kflags; // to have a check on permissions
 	    curthread->file_table[i]->reference=1 ; 
 
 	
@@ -234,12 +237,16 @@ ssize_t sys___read(int fd, void *buf, size_t buflen, int *retval)
 	if(fd<0 || fd>= OPEN_MAX || curthread->file_table[fd]==NULL)
 		return EBADF;
 
+
 	ret=copycheck2((const_userptr_t)buf, buflen, &stoplen);
 
 	if(ret)
 		return EFAULT;
 
 	file=curthread->file_table[fd];
+
+	if(file==NULL)
+		return EBADF;
 
 	if(file->mode==O_WRONLY)
 		return EBADF;
@@ -292,7 +299,7 @@ ssize_t sys___write(int fd, void *buf, size_t buflen, int *retval)
 
 	file=curthread->file_table[fd];
 
-	if(file->mode==O_RDONLY)
+	if(file==NULL || file->mode==O_RDONLY)
 		return EBADF;
 
 	node=file->vn;
